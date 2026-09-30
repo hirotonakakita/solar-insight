@@ -1,0 +1,24 @@
+{
+  "feature_order": [
+    "group_count",
+    "spot_count",
+    "relative_number"
+  ],
+  "mean": [
+    4.755905511810974,
+    13.410054512416714,
+    60.969109630526944
+  ],
+  "scale": [
+    0.959074710951683,
+    8.763512300831016,
+    14.901725813392837
+  ],
+  "max_abs_residual": [
+    5.906386491005833e-14,
+    2.220446049250313e-15,
+    3.9968028886505635e-15
+  ],
+  "source": "Paired raw/scaled columns of supplied D CSV, 1651 rows",
+  "checkpoint_training_provenance_verified": false
+}

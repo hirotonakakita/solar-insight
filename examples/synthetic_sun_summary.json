@@ -1,0 +1,11 @@
+{
+  "image": "synthetic_sun.png",
+  "disk_center": [
+    384,
+    384
+  ],
+  "disk_radius": 323,
+  "spot_count": 3,
+  "group_count": 2,
+  "relative_number": 23
+}

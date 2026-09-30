@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solar-insight"
+version = "0.1.0"
+description = "Solar white-light image analysis and experimental flare inference"
+requires-python = ">=3.11"
+dependencies = ["numpy", "opencv-python-headless", "Pillow"]
+
+[project.optional-dependencies]
+ml = ["torch", "torchvision"]
+
+[project.scripts]
+solar-insight = "solar_insight.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
