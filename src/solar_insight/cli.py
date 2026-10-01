@@ -7,9 +7,16 @@ import cv2
 import numpy as np
 from .detection import (preprocess_for_detection, detect_solar_disk,
                         detect_sunspots_from_masked, group_sunspots_with_labels)
+from .orientation import draw_disk_guides, solar_orientation
 
 
-def analyze(image_path, output_dir):
+def analyze(image_path, output_dir, *, observed_at=None, latitude=None,
+            longitude=None, elevation_m=0, timezone_name="Asia/Tokyo", mirror_x=False):
+    supplied = (observed_at is not None, latitude is not None, longitude is not None)
+    if any(supplied) and not all(supplied):
+        raise ValueError("Solar axes need observed_at, latitude and longitude together")
+    orientation = (solar_orientation(observed_at, latitude, longitude, elevation_m,
+                                     timezone_name, mirror_x) if all(supplied) else None)
     image_path, output_dir = Path(image_path), Path(output_dir)
     image = cv2.imread(str(image_path))
     if image is None:
@@ -28,6 +35,8 @@ def analyze(image_path, output_dir):
               "group_count": len(groups),
               "relative_number": 10 * len(groups) + len(centers)}
     annotated = image.copy()
+    if orientation is not None:
+        result["orientation"] = orientation
     for cx, cy in centers:
         cv2.drawMarker(annotated, (cx, cy), (0, 255, 0),
                        markerType=cv2.MARKER_CROSS, markerSize=10)
@@ -38,11 +47,14 @@ def analyze(image_path, output_dir):
         cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 255), 1)
         cv2.putText(annotated, str(idx), (int(x1), max(12, int(y1)-5)),
                     cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1)
+    draw_disk_guides(annotated, center, radius, orientation)
     canvas = np.hstack([image, annotated])
     output_dir.mkdir(parents=True, exist_ok=True)
     base = output_dir / image_path.stem
     if not cv2.imwrite(str(base) + "_comparison.png", canvas):
         raise OSError("Failed to write comparison image")
+    if not cv2.imwrite(str(base) + "_annotated.png", annotated):
+        raise OSError("Failed to write annotated image")
     Path(str(base) + "_summary.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     with Path(str(base) + "_spots.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -59,11 +71,20 @@ def main():
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--scaler", type=Path)
     parser.add_argument("--allow-legacy-preprocessing", action="store_true")
+    parser.add_argument("--observed-at", help="ISO capture time; naive values use --timezone")
+    parser.add_argument("--latitude", type=float, help="Observer latitude in degrees")
+    parser.add_argument("--longitude", type=float, help="Observer longitude, east positive")
+    parser.add_argument("--elevation-m", type=float, default=0)
+    parser.add_argument("--timezone", default="Asia/Tokyo")
+    parser.add_argument("--mirror-x", action="store_true", help="Input is left-right mirrored")
     args = parser.parse_args()
     if args.checkpoint and (not args.scaler or not args.allow_legacy_preprocessing):
         parser.error("Experimental inference needs --scaler and --allow-legacy-preprocessing")
     try:
-        result = analyze(args.image, args.output_dir)
+        result = analyze(args.image, args.output_dir, observed_at=args.observed_at,
+                         latitude=args.latitude, longitude=args.longitude,
+                         elevation_m=args.elevation_m, timezone_name=args.timezone,
+                         mirror_x=args.mirror_x)
         if args.checkpoint:
             from .inference import predict
             result["experimental_inference"] = predict(args.image, result, args.checkpoint, args.scaler)

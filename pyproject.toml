@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "solar-insight"
-version = "0.1.0"
-description = "Solar white-light image analysis and experimental flare inference"
+version = "0.2.0"
+description = "Sunspot image analysis and experimental solar flare inference"
 requires-python = ">=3.11"
-dependencies = ["numpy", "opencv-python-headless", "Pillow"]
+dependencies = ["numpy", "opencv-python-headless", "Pillow", "tzdata"]
 
 [project.optional-dependencies]
 ml = ["torch", "torchvision"]
+solar = ["sunpy>=6,<9", "astropy>=6"]
 
 [project.scripts]
 solar-insight = "solar_insight.cli:main"
