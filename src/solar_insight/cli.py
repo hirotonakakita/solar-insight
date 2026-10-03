@@ -7,14 +7,17 @@ import cv2
 import numpy as np
 from .detection import (preprocess_for_detection, detect_solar_disk,
                         detect_sunspots_from_masked, group_sunspots_with_labels)
-from .orientation import draw_disk_guides, solar_orientation
+from .orientation import draw_disk_guides, draw_heliographic_grid, solar_orientation
 
 
 def analyze(image_path, output_dir, *, observed_at=None, latitude=None,
-            longitude=None, elevation_m=0, timezone_name="Asia/Tokyo", mirror_x=False):
+            longitude=None, elevation_m=0, timezone_name="Asia/Tokyo", mirror_x=False,
+            grid=False, grid_spacing=30):
     supplied = (observed_at is not None, latitude is not None, longitude is not None)
     if any(supplied) and not all(supplied):
         raise ValueError("Solar axes need observed_at, latitude and longitude together")
+    if grid and not all(supplied):
+        raise ValueError("Heliographic grid needs observation time and observer coordinates")
     orientation = (solar_orientation(observed_at, latitude, longitude, elevation_m,
                                      timezone_name, mirror_x) if all(supplied) else None)
     image_path, output_dir = Path(image_path), Path(output_dir)
@@ -37,6 +40,10 @@ def analyze(image_path, output_dir, *, observed_at=None, latitude=None,
     annotated = image.copy()
     if orientation is not None:
         result["orientation"] = orientation
+    if grid:
+        draw_heliographic_grid(annotated, center, radius, orientation, grid_spacing)
+        result["heliographic_grid"] = {"frame": "Stonyhurst", "spacing_deg": grid_spacing,
+                                       "visible_surface_only": True}
     for cx, cy in centers:
         cv2.drawMarker(annotated, (cx, cy), (0, 255, 0),
                        markerType=cv2.MARKER_CROSS, markerSize=10)
@@ -77,6 +84,8 @@ def main():
     parser.add_argument("--elevation-m", type=float, default=0)
     parser.add_argument("--timezone", default="Asia/Tokyo")
     parser.add_argument("--mirror-x", action="store_true", help="Input is left-right mirrored")
+    parser.add_argument("--grid", action="store_true", help="Draw heliographic latitude/longitude grid")
+    parser.add_argument("--grid-spacing", type=int, choices=(10, 15, 30), default=30)
     args = parser.parse_args()
     if args.checkpoint and (not args.scaler or not args.allow_legacy_preprocessing):
         parser.error("Experimental inference needs --scaler and --allow-legacy-preprocessing")
@@ -84,7 +93,7 @@ def main():
         result = analyze(args.image, args.output_dir, observed_at=args.observed_at,
                          latitude=args.latitude, longitude=args.longitude,
                          elevation_m=args.elevation_m, timezone_name=args.timezone,
-                         mirror_x=args.mirror_x)
+                         mirror_x=args.mirror_x, grid=args.grid, grid_spacing=args.grid_spacing)
         if args.checkpoint:
             from .inference import predict
             result["experimental_inference"] = predict(args.image, result, args.checkpoint, args.scaler)

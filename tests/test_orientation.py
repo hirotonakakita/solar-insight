@@ -5,7 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 from solar_insight.cli import analyze
-from solar_insight.orientation import axis_vectors, parse_observed_at, solar_orientation
+from solar_insight.orientation import (axis_vectors, parse_observed_at,
+                                      solar_orientation, heliographic_grid)
 
 
 class OrientationTests(unittest.TestCase):
@@ -33,6 +34,28 @@ class OrientationTests(unittest.TestCase):
     def test_partial_metadata_rejected(self):
         with self.assertRaises(ValueError):
             analyze("unused.png", "unused", latitude=35)
+        with self.assertRaises(ValueError):
+            analyze("unused.png", "unused", grid=True)
+
+    def test_grid_projection_and_mirror(self):
+        try:
+            import sunpy
+        except ImportError:
+            self.skipTest("Optional solar dependencies not installed")
+        a = solar_orientation("2025-04-30T14:08:10", 34.965, 136.624)
+        b = dict(a, mirror_x=True)
+        curves = heliographic_grid((400, 400), 300, a)
+        mirrored = heliographic_grid((400, 400), 300, b)
+        self.assertTrue(any(c["kind"] == "latitude" and c["degrees"] == 0 for c in curves))
+        self.assertTrue(any(c["kind"] == "longitude" and c["degrees"] == 0 for c in curves))
+        for c, m in zip(curves, mirrored):
+            np.testing.assert_allclose(c["points"][:, 0]+m["points"][:, 0], 800)
+            np.testing.assert_allclose(c["points"][:, 1], m["points"][:, 1])
+            self.assertTrue((np.linalg.norm(c["points"]-400, axis=1) < 300.01).all())
+        # Sun's equator is curved/off-centre for nonzero B0, unlike an axis line.
+        n = np.array(axis_vectors(a["solar_north_from_zenith_deg"])["N"])
+        equator = next(c["points"] for c in curves if c["kind"] == "latitude" and c["degrees"] == 0)
+        self.assertGreater(np.ptp((equator-400) @ n), 10)
 
     def test_actual_ephemeris_and_site_dependence(self):
         try:
@@ -65,7 +88,7 @@ class OrientationTests(unittest.TestCase):
             cv2.imwrite(str(p/"sun.png"), image)
             a = analyze(p/"sun.png", p/"plain")
             b = analyze(p/"sun.png", p/"axes", observed_at="2025-04-30T14:08:10",
-                        latitude=35, longitude=137)
+                        latitude=35, longitude=137, grid=True)
             for key in ("spot_count", "group_count", "relative_number"):
                 self.assertEqual(a[key], b[key])
             self.assertEqual(b["relative_number"], 23)

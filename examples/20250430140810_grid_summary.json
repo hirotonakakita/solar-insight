@@ -1,0 +1,37 @@
+{
+  "image": "20250430140810.png",
+  "disk_center": [
+    518,
+    930
+  ],
+  "disk_radius": 405,
+  "spot_count": 20,
+  "group_count": 8,
+  "relative_number": 100,
+  "orientation": {
+    "observed_at_utc": "2025-04-30T05:08:10+00:00",
+    "input_timezone": "Asia/Tokyo",
+    "latitude_deg": 34.965,
+    "longitude_deg": 136.624,
+    "elevation_m": 0,
+    "image_top": "local_zenith",
+    "mirror_x": false,
+    "solar_north_from_zenith_deg": 74.77798384158291,
+    "p_angle_deg": -24.22278031322262,
+    "b0_angle_deg": -4.252578860455787,
+    "sun_altitude_deg": 53.20112589186164,
+    "angle_convention": "eastward from zenith; includes P angle"
+  },
+  "heliographic_grid": {
+    "frame": "Stonyhurst",
+    "spacing_deg": 30,
+    "visible_surface_only": true
+  },
+  "display_crop_xyxy": [
+    63,
+    475,
+    973,
+    1385
+  ],
+  "site_precision": "approximate city-centre coordinates, not exact capture site"
+}

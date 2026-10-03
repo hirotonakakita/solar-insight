@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import math
 import cv2
+import numpy as np
 
 
 def parse_observed_at(value, timezone_name="Asia/Tokyo"):
@@ -83,3 +84,54 @@ def draw_disk_guides(image, center, radius, orientation=None):
             cv2.putText(image, label, (max(0, min(image.shape[1]-18, x-7)),
                                       max(14, min(image.shape[0]-3, y+5))),
                         cv2.FONT_HERSHEY_SIMPLEX, .55, color, 2, cv2.LINE_AA)
+
+
+def heliographic_grid(center, radius, orientation, spacing=30):
+    """Project Stonyhurst surface grid via SunPy; omit the far side."""
+    if spacing not in (10, 15, 30):
+        raise ValueError("Grid spacing must be 10, 15 or 30 degrees")
+    import astropy.units as u
+    from astropy.coordinates import EarthLocation, SkyCoord
+    from astropy.time import Time
+    from astropy.utils import iers
+    from sunpy.coordinates import frames
+    from sunpy.sun import constants
+    t = Time(datetime.fromisoformat(orientation["observed_at_utc"]))
+    location = EarthLocation.from_geodetic(orientation["longitude_deg"]*u.deg,
+                                          orientation["latitude_deg"]*u.deg,
+                                          orientation["elevation_m"]*u.m)
+    vectors = axis_vectors(orientation["solar_north_from_zenith_deg"],
+                           orientation["mirror_x"])
+    north, west = np.array(vectors["N"]), np.array(vectors["W"])
+    curves = []
+    with iers.conf.set_temp("auto_download", False):
+        observer = location.get_itrs(t).transform_to(frames.HeliographicStonyhurst(obstime=t))
+        angular_radius = np.arcsin((constants.radius/observer.radius).to_value(u.one))
+        target = frames.Helioprojective(observer=observer, obstime=t)
+        def project(lon, lat, kind, value):
+            surface = SkyCoord(lon*u.deg, lat*u.deg, constants.radius,
+                               frame=frames.HeliographicStonyhurst, obstime=t)
+            projected = surface.transform_to(target)
+            x = projected.Tx.to_value(u.rad)/angular_radius
+            y = projected.Ty.to_value(u.rad)/angular_radius
+            pixels = np.array(center) + radius*(x[:, None]*west + y[:, None]*north)
+            visible = projected.is_visible() & np.isfinite(pixels).all(axis=1)
+            # Split runs: never connect across hidden portions of the solar sphere.
+            indices = np.flatnonzero(visible)
+            for run in np.split(indices, np.flatnonzero(np.diff(indices)>1)+1):
+                if len(run)>1:
+                    curves.append({"kind": kind, "degrees": value, "points": pixels[run]})
+        longitude = np.linspace(-180, 180, 721)
+        latitude = np.linspace(-90, 90, 361)
+        for value in range(-90+spacing, 90, spacing):
+            project(longitude, np.full_like(longitude, value), "latitude", value)
+        for value in range(-180, 180, spacing):
+            project(np.full_like(latitude, value), latitude, "longitude", value)
+    return curves
+
+
+def draw_heliographic_grid(image, center, radius, orientation, spacing=30):
+    for curve in heliographic_grid(center, radius, orientation, spacing):
+        color = (180, 145, 80) if curve["kind"] == "latitude" else (80, 155, 180)
+        cv2.polylines(image, [np.rint(curve["points"]).astype(np.int32)], False,
+                      color, 1, cv2.LINE_AA)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "solar-insight"
-version = "0.2.0"
+version = "0.2.1"
 description = "Sunspot image analysis and experimental solar flare inference"
 requires-python = ">=3.11"
 dependencies = ["numpy", "opencv-python-headless", "Pillow", "tzdata"]
