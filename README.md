@@ -9,13 +9,25 @@
 
 ## クイックスタート
 
-```
+Windowsのコマンドプロンプト：
+
+```bat
 python -m venv .venv
+.venv\Scripts\activate.bat
 python -m pip install -e .
 solar-insight sample_data/20250430140810.png --output-dir outputs
 ```
 
-仮想環境の有効化など、詳しい手順は「実行方法」を参照してください。
+macOS/Linux：
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+solar-insight sample_data/20250430140810.png --output-dir outputs
+```
+
+プロジェクトフォルダから実行してください。詳しいオプションは「実行方法」を参照してください。
 
 ---
 
@@ -61,12 +73,9 @@ solar-insight sample_data/20250430140810.png --output-dir outputs --observed-at 
 
 ## 実行方法
 
-Python 3.11以上で、プロジェクトフォルダから実行します。
+Python 3.11以上で、プロジェクトフォルダから実行します。仮想環境の作成・有効化は「クイックスタート」のOS別手順を使用してください。
 
 ```sh
-python -m venv .venv
-# Windowsのコマンドプロンプト: .venv\Scripts\activate.bat
-# macOS/Linux: source .venv/bin/activate
 python -m pip install -e .
 solar-insight sample_data/20250430140810.png --output-dir outputs
 ```
@@ -83,7 +92,7 @@ python -m unittest discover -s tests
 ### 天頂が上の画像に方位線を描く
 
 ```sh
-python -m pip install -e '.[solar]'
+python -m pip install -e ".[solar]"
 solar-insight sample_data/20250430140810.png --output-dir outputs --observed-at "2025-04-30T14:08:10+09:00" --latitude 34.965 --longitude 136.624
 ```
 
@@ -102,15 +111,31 @@ SunPyの `sun.orientation` で視野の回転とP角を含む太陽北の向き�
 学習済み重みは同梱していません。既存の重みを利用する場合は、追加依存と数値の標準化設定が必要です。
 
 ```sh
-python -m pip install -e '.[ml]'
+python -m pip install -e ".[ml]"
 solar-insight sample_data/20250430140810.png --checkpoint /path/to/flare_model.pth --scaler config/legacy_scaler_recovered.json --allow-legacy-preprocessing
 ```
 
 標準化設定は旧CSVから復元したもので、重み作成時の設定との一致は未確認です。CPUで構造の厳密一致と推論の実行は確認しましたが、X/Mスコアがともに1.0になるなど出力の妥当性は未解決です。
 
+## トラブルシューティング
+
+エラーは端末に表示されます。まず次の点を確認してください。
+
+| 症状・メッセージ | 確認・対処 |
+|---|---|
+| `Cannot read image: ...` | 画像パス、ファイルの存在、読み取り権限、画像形式を確認します。相対パスはコマンドを実行しているフォルダが基準です。 |
+| Windowsで日本語を含むパスの画像が読めない | この環境では未確認です。上のエラーが出る場合は、英数字だけのフォルダ・ファイル名へコピーして、パスが原因か切り分けます。 |
+| `Solar axes need observed_at, latitude and longitude together` | `--observed-at`・`--latitude`・`--longitude` を3つとも指定します。方位線が不要なら3つとも外します。 |
+| `Heliographic grid needs observation time and observer coordinates` | `--grid` に撮影日時・緯度・経度の3つを追加します。 |
+| `Solar axes require: ...`、またはSunPy/Astropyのインポートエラー | 有効な仮想環境で `python -m pip install -e ".[solar]"` を実行します。 |
+| `--grid-spacing` の `invalid choice` | 格子間隔は `10`・`15`・`30` のいずれかを指定します。 |
+| `Experimental inference needs --scaler and --allow-legacy-preprocessing` | 推論には重みのほかに `--scaler` と `--allow-legacy-preprocessing` が必要です。画像解析だけなら `--checkpoint` を外します。 |
+| インストール時にPythonのバージョン不適合と表示される | `python --version` で3.11以上か確認します。古い場合は対応するPythonで仮想環境を作り直します。 |
+| `solar-insight` が見つからない／認識されない | 仮想環境を有効化し、同じ環境で `python -m pip install -e .` を実行します。代わりに `python -m solar_insight.cli` に同じ引数を付けても実行できます。 |
+
 ## 今後の課題
 
-- **黒点検出・群分け**：現在の閾値と80pxの距離条件は解像度に依存します。本影・半暗部の識別と、正解ラベルによる検出精度の評価が必要です。
+- **黒点検出・群分け**：現在の閾値と80pxの距離条件は解像度に依存します。閾値の設定ファイル化と、画像サイズに応じた条件の見直しも課題です。本影・半暗部の識別と、正解ラベルによる検出精度の評価が必要です。
 - **座標と方位**：外周円と撮影地・時刻に基づく方位線を実装しました。参照画像との実測比較や、長時間スタッキングによる視野回転の確認が必要です。太陽面格子の描画には座標変換を使用していますが、検出した黒点の緯度経度出力と、角距離による群分けは今後の課題です。
 - **学習・推論画像の統一**：天文台画像とSeestar画像で、サイズ・明度・画質・数値指標の分布が異なります。残存コードの検出・表示用補正はモデル入力には適用されておらず、前処理の統一が課題です。
 - **予測期間の定義**：撮影後24時間以内を想定しましたが、既存モデルは同日の画像とフレア記録を対応させています。撮影前のイベントを含まない正解データの作成が必要です。
